@@ -27,8 +27,9 @@ export default function Navbar() {
             setUser(session?.user ?? null)
         })
 
+        // Empty array ensures this listener mounts exactly ONCE per session lifecycle
         return () => subscription.unsubscribe()
-    }, [supabase])
+    }, []) // <--- FIXED: Emptied dependency array to stop the cascading loop
 
     const handleLogout = async () => {
         await supabase.auth.signOut()
