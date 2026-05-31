@@ -2,6 +2,7 @@
 const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ["pdf-parse"],
+    serverComponentsExternalPackages: ['@supabase/supabase-js'],
   },
 };
 
