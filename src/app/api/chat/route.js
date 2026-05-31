@@ -2,7 +2,8 @@ import { OpenAI } from 'openai'
 import { createClient } from '@supabase/supabase-js'
 import { getEncoding } from 'js-tiktoken'
 
-export const runtime = 'edge'
+// export const runtime = 'edge'
+export const runtime = 'nodejs'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
