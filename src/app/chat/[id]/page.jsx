@@ -6,7 +6,8 @@ import { createClient } from '@/utils/supabase/client'
 
 export default function ChatbotPublicPage() {
   const params = useParams()
-  const chatbotId = params.id
+  // Ensure we stringify or cleanly extract to break object identity shifting
+  const chatbotId = params?.id 
   const supabase = createClient()
 
   // Functional Interface States
@@ -31,10 +32,11 @@ export default function ChatbotPublicPage() {
 
   // Initial Fetch: Load Chatbot Identity Configuration
   useEffect(() => {
+    // CRITICAL: Guard loop execution against empty or undefined initial parameter hits
+    if (!chatbotId) return
+
     const fetchChatbotIdentity = async () => {
       try {
-        if (!chatbotId) return
-
         const { data, error } = await supabase
           .from('chatbots')
           .select('name')
@@ -55,7 +57,8 @@ export default function ChatbotPublicPage() {
     }
 
     fetchChatbotIdentity()
-  }, [chatbotId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatbotId]) // ✅ Stable primitive tracking string string anchor bounds
 
   // Form Submission Handler: Process Prompts & Stream Completions
   const handleSendMessage = async (e) => {
@@ -85,10 +88,8 @@ export default function ChatbotPublicPage() {
       // BILLING GUARDRAIL INTERCEPT: TRAP PLAN FAILURE BOUNDS
       // ========================================================
       if (!response.ok) {
-        // Capture the plain-text tier limit explanation passed down from /api/chat
         const limitErrorExplanation = await response.text()
         
-        // Push a dedicated system notification bubble straight into the chat viewport
         setMessages((prev) => [
           ...prev,
           {
@@ -106,7 +107,6 @@ export default function ChatbotPublicPage() {
       const streamReader = response.body.getReader()
       const textDecoder = new TextDecoder()
       
-      // Initialize an empty space in state for the oncoming assistant response tokens
       setMessages((prev) => [...prev, { role: 'assistant', content: '' }])
 
       while (true) {
@@ -115,7 +115,6 @@ export default function ChatbotPublicPage() {
 
         const chunkText = textDecoder.decode(value, { stream: true })
 
-        // Append oncoming characters directly into the final message item in state
         setMessages((prev) => {
           const adjustedHistory = [...prev]
           const activeIndex = adjustedHistory.length - 1
@@ -161,10 +160,9 @@ export default function ChatbotPublicPage() {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col font-sans selection:bg-neutral-800">
-      
       {/* Upper Brand Nav Frame */}
       <header className="bg-neutral-900 border-b border-neutral-800 px-6 py-4 flex items-center justify-between shrink-0">
-        <div className="flex items-center space-y-0.5 gap-3">
+        <div className="flex items-center gap-3">
           <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
           <div>
             <h1 className="text-sm font-bold uppercase tracking-tight font-mono text-neutral-200">
@@ -188,7 +186,6 @@ export default function ChatbotPublicPage() {
         )}
 
         {messages.map((msg, index) => {
-          // System / Limit Warning Bubbles Styling
           if (msg.role === 'system') {
             return (
               <div key={index} className="flex justify-center my-4">
@@ -210,7 +207,6 @@ export default function ChatbotPublicPage() {
                     : 'bg-neutral-900 border border-neutral-800 text-neutral-200 rounded-tl-none font-sans'
                 }`}
               >
-                {/* Break text into clean paragraphs safely */}
                 {msg.content.split('\n').map((para, pIdx) => (
                   <p key={pIdx} className={pIdx > 0 ? 'mt-2' : ''}>
                     {para}
@@ -221,7 +217,7 @@ export default function ChatbotPublicPage() {
           )
         })}
 
-        {/* Loading / Writing Wave Indicator */}
+        {/* Loading Indicator */}
         {isLoading && messages[messages.length - 1]?.role === 'user' && (
           <div className="flex justify-start">
             <div className="bg-neutral-900 border border-neutral-800 rounded-2xl rounded-tl-none px-4 py-3 flex items-center space-x-1.5 h-9">
@@ -235,7 +231,7 @@ export default function ChatbotPublicPage() {
         <div ref={messagesEndRef} />
       </main>
 
-      {/* Input Message Dispatcher Form Bar */}
+      {/* Input Form Bar */}
       <footer className="border-t border-neutral-900 p-4 bg-neutral-950 shrink-0">
         <form onSubmit={handleSendMessage} className="max-w-3xl mx-auto flex gap-3">
           <input
@@ -250,7 +246,7 @@ export default function ChatbotPublicPage() {
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="bg-neutral-100 text-neutral-950 hover:bg-neutral-200 disabled:opacity-40 disabled:hover:bg-neutral-100 font-bold px-5 rounded-xl text-xs tracking-wider uppercase font-mono transition font-black"
+            className="bg-neutral-100 text-neutral-950 hover:bg-neutral-200 disabled:opacity-40 disabled:hover:bg-neutral-100 font-bold px-5 rounded-xl text-xs tracking-wider uppercase font-mono transition"
           >
             SEND
           </button>
