@@ -13,7 +13,6 @@ export default function CreateEmbeddingsPage() {
   const [selectedChatbotId, setSelectedChatbotId] = useState('')
   const [file, setFile] = useState(null)
   const [newBotName, setNewBotName] = useState('')
-  const [userId, setUserId] = useState(null) // ✅ Safe Local User Context State Memory
   
   // UI Management States
   const [fetchingBots, setFetchingBots] = useState(true)
@@ -33,9 +32,6 @@ export default function CreateEmbeddingsPage() {
           setStatus({ type: 'error', message: 'Authentication required. Please log in first.' })
           return
         }
-
-        // Cache the ID locally to eliminate duplicate downstream auth calls
-        setUserId(user.id) 
 
         // Fetch chatbots belonging to this user profile
         const { data, error } = await supabase
@@ -59,19 +55,19 @@ export default function CreateEmbeddingsPage() {
     }
 
     fetchUserChatbots()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Create Chatbot Form Handler
   const handleCreateChatbot = async (e) => {
     e.preventDefault()
-    if (!newBotName.trim() || !userId) return
+    if (!newBotName.trim()) return
 
     try {
-      // ✅ FIXED: Using optimized cached state string instead of hitting over-the-air API routes again
+      const { data: { user } } = await supabase.auth.getUser()
+      
       const { data, error } = await supabase
         .from('chatbots')
-        .insert({ name: newBotName, profile_id: userId })
+        .insert({ name: newBotName, profile_id: user.id })
         .select()
         .single()
 
@@ -81,10 +77,10 @@ export default function CreateEmbeddingsPage() {
         alert(`Chatbot "${data.name}" created!`)
         setChatbots([data, ...chatbots])
         setSelectedChatbotId(data.id)
-        NewBotName('')
+        setNewBotName('')
       }
     } catch (err) {
-      Alert(err.message)
+      alert(err.message)
     }
   }
 
@@ -94,32 +90,32 @@ export default function CreateEmbeddingsPage() {
     if (!selectedFile) return
 
     if (selectedFile.type !== 'application/pdf') {
-      SetStatus({ type: 'error', message: 'Only PDF documents are supported at this time.' })
-      SetFile(null)
+      setStatus({ type: 'error', message: 'Only PDF documents are supported at this time.' })
+      setFile(null)
       return
     }
 
     setFile(selectedFile)
-    SetStatus({ type: '', message: '' }) // Clear errors
+    setStatus({ type: '', message: '' }) // Clear errors
   }
 
   // Drag and drop event helper bindings
   const handleDragEnter = (e) => {
-    E.preventDefault()
-    E.stopPropagation()
-    SetIsDragging(true)
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
   }
 
   const handleDragLeave = (e) => {
-    E.preventDefault()
-    E.stopPropagation()
-    SetIsDragging(false)
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
   }
 
   const handleDrop = (e) => {
-    E.preventDefault()
-    E.stopPropagation()
-    SetIsDragging(false)
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
     
     if (uploading || chatbots.length === 0) return
 
@@ -127,33 +123,32 @@ export default function CreateEmbeddingsPage() {
     if (!droppedFile) return
 
     if (droppedFile.type !== 'application/pdf') {
-      SetStatus({ type: 'error', message: 'Only PDF documents are supported at this time.' })
-      SetFile(null)
+      setStatus({ type: 'error', message: 'Only PDF documents are supported at this time.' })
+      setFile(null)
       return
     }
 
     setFile(droppedFile)
-    SetStatus({ type: '', message: '' })
+    setStatus({ type: '', message: '' })
   }
 
   // Submit Data to backend Pipeline
   const handleUploadSubmit = async (e) => {
-    E.preventDefault()
+    e.preventDefault()
     if (!selectedChatbotId) return alert('Please select or create a chatbot first.')
     if (!file) return alert('Please upload a valid PDF document.')
 
-    SetUploading(true)
-    SetStatus({ type: 'info', message: 'Uploading document, extracting text segments, and generating vectors...' })
+    setUploading(true)
+    setStatus({ type: 'info', message: 'Uploading document, extracting text segments, and generating vectors...' })
 
     try {
       const formData = new FormData()
-      FormData.append('file', file)
-      FormData.append('chatbotId', selectedChatbotId)
+      formData.append('file', file)
+      formData.append('chatbotId', selectedChatbotId)
 
-      // Fires straight to your heavy parsing endpoint clean and targeted
       const response = await fetch('/api/upload', {
         method: 'POST',
-        Body: formData,
+        body: formData,
       })
 
       const result = await response.json()
@@ -162,47 +157,48 @@ export default function CreateEmbeddingsPage() {
         throw new Error(result.error || 'Pipeline execution failed.')
       }
 
-      SetStatus({ 
-        Type: 'success', 
-        Message: `✓ Successfully trained! "${result.filename || file.name}" has been fully embedded and isolated inside pgvector.` 
+      setStatus({ 
+        type: 'success', 
+        message: `✓ Successfully trained! "${result.filename || file.name}" has been fully embedded and isolated inside pgvector.` 
       })
-      SetFile(null) // Reset file input
+      setFile(null) // Reset file input
       
+      // Clear file input DOM element manually safely using ref
       if (fileInputRef.current) fileInputRef.current.value = ''
 
     } catch (err) {
-      SetStatus({ type: 'error', message: `Pipeline Error: ${err.message}` })
+      setStatus({ type: 'error', message: `Pipeline Error: ${err.message}` })
     } finally {
-      SetUploading(false)
+      setUploading(false)
     }
   }
 
   return (
     <>
+
       {/* Main Container Layout */}
       <main className="min-h-screen bg-gradient-to-br from-white via-slate-50 to-blue-50 px-6 py-12 antialiased">
         <div className="mx-auto max-w-4xl">
           
           {/* Header Section */}
-          <div className="mb-12">
+          <div className="mb-12" style={{ animation: 'slideInDown 0.6s ease-out' }}>
             <h1 className="text-4xl font-bold text-slate-900 mb-2">Chatbot Training Center</h1>
             <p className="text-lg text-slate-600">Create and train your AI chatbots with custom knowledge bases</p>
           </div>
 
           {/* Create New Chatbot Section Form */}
-          <div className="mb-8 rounded-xl bg-white border border-slate-200 p-8 shadow-sm">
+          <div className="mb-8 card-enter rounded-xl bg-white border border-slate-200 p-8 shadow-sm">
             <form onSubmit={handleCreateChatbot} className="flex flex-col sm:flex-row gap-4">
               <input
                 type="text"
-                Value={newBotName}
-                OnChange={(e) => setNewBotName(e.target.value)}
-                Placeholder="New Chatbot Name (e.g. RecommendationBot)"
-                ClassName="flex-1 rounded-lg border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 placeholder-slate-500 transition-all duration-300 focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                value={newBotName}
+                onChange={(e) => setNewBotName(e.target.value)}
+                placeholder="New Chatbot Name (e.g. RecommendationBot)"
+                className="flex-1 rounded-lg border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900 placeholder-slate-500 transition-all duration-300 focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               />
               <button
                 type="submit"
-                Disabled={!newBotName.trim()}
-                ClassName="rounded-lg bg-blue-600 px-8 py-3 font-semibold text-white shadow-lg shadow-blue-600/30 transition-all duration-300 hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-600/40 disabled:opacity-50"
+                className="rounded-lg bg-blue-600 px-8 py-3 font-semibold text-white shadow-lg shadow-blue-600/30 transition-all duration-300 hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-600/40"
               >
                 Create Bot
               </button>
@@ -210,7 +206,7 @@ export default function CreateEmbeddingsPage() {
           </div>
 
           {/* Knowledge Base Training Section Form */}
-          <div className="rounded-xl bg-white border border-slate-200 p-8 shadow-sm">
+          <div className="card-enter rounded-xl bg-white border border-slate-200 p-8 shadow-sm" style={{ animationDelay: '0.1s' }}>
             <div className="mb-8">
               <h2 className="text-2xl font-bold text-slate-900 mb-2">Knowledge Base Training</h2>
               <p className="text-slate-600">Feed operational data to specific chatbot instances using PDF documents.</p>
@@ -232,10 +228,10 @@ export default function CreateEmbeddingsPage() {
                 ) : (
                   <div className="relative">
                     <select
-                      Value={selectedChatbotId}
-                      OnChange={(e) => setSelectedChatbotId(e.target.value)}
-                      ClassName="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900 transition-all duration-300 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 appearance-none cursor-pointer text-sm"
-                      Required
+                      value={selectedChatbotId}
+                      onChange={(e) => setSelectedChatbotId(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-900 transition-all duration-300 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 appearance-none cursor-pointer text-sm"
+                      required
                     >
                       {chatbots.map((bot) => (
                         <option key={bot.id} value={bot.id}>
@@ -259,24 +255,24 @@ export default function CreateEmbeddingsPage() {
                 </label>
                 
                 <div
-                  OnDragEnter={handleDragEnter}
-                  OnDragLeave={handleDragLeave}
-                  OnDragOver={(e) => e.preventDefault()}
-                  OnDrop={handleDrop}
-                  ClassName={`relative rounded-xl border-2 border-dashed transition-all duration-300 p-12 text-center group ${
-                    IsDragging
-                      ? 'bg-blue-50/50 border-blue-500'
+                  onDragEnter={handleDragEnter}
+                  onDragLeave={handleDragLeave}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleDrop}
+                  className={`relative rounded-xl border-2 border-dashed transition-all duration-300 p-12 text-center group ${
+                    isDragging
+                      ? 'drop-zone-active bg-blue-50/50 border-blue-500'
                       : 'border-slate-300 bg-slate-50 hover:border-blue-300'
                   }`}
                 >
                   <input
-                    Ref={fileInputRef}
-                    Type="file"
-                    Id="pdf-file-input"
-                    Accept=".pdf"
-                    OnChange={handleFileChange}
-                    ClassName="hidden"
-                    Disabled={uploading || chatbots.length === 0}
+                    ref={fileInputRef}
+                    type="file"
+                    id="pdf-file-input"
+                    accept=".pdf"
+                    onChange={handleFileChange}
+                    className="hidden"
+                    disabled={uploading || chatbots.length === 0}
                   />
 
                   <svg className="h-12 w-12 mx-auto mb-4 text-slate-400 group-hover:text-blue-500 transition-colors duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -284,11 +280,11 @@ export default function CreateEmbeddingsPage() {
                   </svg>
 
                   <button
-                    Type="button"
-                    OnClick={() => fileInputRef.current?.click()}
-                    Disabled={uploading || chatbots.length === 0}
-                    ClassName={`text-slate-900 hover:text-blue-600 transition-colors duration-300 font-semibold text-lg block mx-auto mb-1 focus:outline-none ${
-                      Uploading || chatbots.length === 0 ? 'pointer-events-none opacity-40' : ''
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading || chatbots.length === 0}
+                    className={`text-slate-900 hover:text-blue-600 transition-colors duration-300 font-semibold text-lg block mx-auto mb-1 focus:outline-none ${
+                      uploading || chatbots.length === 0 ? 'pointer-events-none opacity-40' : ''
                     }`}
                   >
                     Click to browse operational PDF
@@ -299,7 +295,7 @@ export default function CreateEmbeddingsPage() {
                   </p>
 
                   {file && (
-                    <div className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-green-50 p-3 border border-green-200 w-fit mx-auto">
+                    <div className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-green-50 p-3 border border-green-200 w-fit mx-auto animate-fade-in">
                       <svg className="h-5 w-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                       </svg>
@@ -311,19 +307,19 @@ export default function CreateEmbeddingsPage() {
 
               {/* Sync Button */}
               <button
-                Type="submit"
-                Disabled={uploading || !file || chatbots.length === 0}
-                ClassName="w-full rounded-lg bg-blue-600 px-6 py-4 font-semibold text-white shadow-lg shadow-blue-600/20 transition-all duration-300 hover:bg-blue-700 hover:shadow-xl disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none disabled:cursor-not-allowed text-base"
+                type="submit"
+                disabled={uploading || !file || chatbots.length === 0}
+                className="w-full rounded-lg bg-blue-600 px-6 py-4 font-semibold text-white shadow-lg shadow-blue-600/20 transition-all duration-300 hover:bg-blue-700 hover:shadow-xl disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none disabled:cursor-not-allowed text-base"
               >
                 {uploading ? 'Syncing PDF Knowledge Array...' : 'Sync PDF Knowledge Array'}
               </button>
             </form>
 
-            {/* Status Display Area */}
+            {/* Dynamic Status Display Message Area */}
             {status.message && (
               <div className={`mt-6 p-4 rounded-lg border text-sm transition-all duration-300 ${
-                Status.type === 'error' ? 'bg-rose-50 border-rose-200 text-rose-700' :
-                Status.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
+                status.type === 'error' ? 'bg-rose-50 border-rose-200 text-rose-700' :
+                status.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
                 'bg-blue-50/50 border-blue-100 text-blue-700 animate-pulse'
               }`}>
                 {status.message}
@@ -332,7 +328,7 @@ export default function CreateEmbeddingsPage() {
           </div>
 
           {/* Info Card / Training Tips */}
-          <div className="mt-8 rounded-xl bg-blue-50 border border-blue-200 p-6">
+          <div className="mt-8 rounded-xl bg-blue-50 border border-blue-200 p-6 card-enter" style={{ animationDelay: '0.2s' }}>
             <div className="flex gap-4">
               <svg className="h-6 w-6 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
